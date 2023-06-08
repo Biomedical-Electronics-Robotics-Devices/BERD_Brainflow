@@ -65,7 +65,8 @@ BrainFlowBoards::BrainFlowBoards()
             {"44", json::object()},
             {"45", json::object()},
             {"46", json::object()},
-            {"48", json::object()}
+            {"48", json::object()},
+            {"49", json::object()}
         }
     }};
 
@@ -883,20 +884,23 @@ BrainFlowBoards::BrainFlowBoards()
     };
     brainflow_boards_json["boards"]["48"]["default"] =
     {
-        {"name", "Cyton"},
+        {"name", "Geenie"},
         {"sampling_rate", 250},
         {"package_num_channel", 0},
-        {"timestamp_channel", 22},
-        {"marker_channel", 23},
-        {"num_rows", 24},
-        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"eeg_names", "Fp1,Fp2,C3,C4,P7,P8,O1,O2"},
-        {"emg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"ecg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"eog_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
-        {"accel_channels", {9, 10, 11}},
-        {"analog_channels", {19, 20, 21}},
-        {"other_channels", {12, 13, 14, 15, 16, 17, 18}}
+        {"timestamp_channel", 9},
+        {"marker_channel", 10},
+        {"num_rows", 11},
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}}
+    };
+    brainflow_boards_json["boards"]["49"]["default"] =
+    {
+        {"name", "Egeenie"},
+        {"sampling_rate", 250},
+        {"package_num_channel", 0},
+        {"timestamp_channel", 9},
+        {"marker_channel", 10},
+        {"num_rows", 11},
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}}
     };
 }
 

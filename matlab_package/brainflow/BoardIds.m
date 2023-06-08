@@ -50,5 +50,7 @@ classdef BoardIds < int32
         EXPLORE_8_CHAN_BOARD(45)
         GANGLION_NATIVE_BOARD(46)
         EMOTIBIT_BOARD(47)
+        GEENIE(48)
+        GEENIE_FROM_FREEEEG_32_BOARD(49)
     end
 end

@@ -1,310 +1,144 @@
-#include <string.h>
+#include <vector>
 
-#include "openbci_serial_board.h"
+#include "custom_cast.h"
+#include "geenie.h"
 #include "serial.h"
-#ifdef _WIN32
-#include "windows_registry.h"
-#endif
+#include "timestamp.h"
 
-OpenBCISerialBoard::OpenBCISerialBoard (struct BrainFlowInputParams params, int board_id)
-    : Board (board_id, params)
+#define START_BYTE 0xA0
+#define END_BYTE_STANDARD 0xC0
+#define END_BYTE_ANALOG 0xC1
+#define END_BYTE_MAX 0xC6
+
+
+int Geenie::config_board (std::string conf, std::string &response)
 {
-    serial = NULL;
-    is_streaming = false;
-    keep_alive = false;
-    initialized = false;
-}
-
-OpenBCISerialBoard::~OpenBCISerialBoard ()
-{
-    skip_logs = true;
-    release_session ();
-}
-
-int OpenBCISerialBoard::open_port ()
-{
-    if (serial->is_port_open ())
+    if (gain_tracker.apply_config (conf) == (int)GeenieCommandTypes::INVALID_COMMAND)
     {
-        safe_logger (spdlog::level::err, "port {} already open", serial->get_port_name ());
-        return (int)BrainFlowExitCodes::PORT_ALREADY_OPEN_ERROR;
+        safe_logger (spdlog::level::warn, "invalid command: {}", conf.c_str ());
+        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
     }
-
-    safe_logger (spdlog::level::info, "opening port {}", serial->get_port_name ());
-    int res = serial->open_serial_port ();
-    if (res < 0)
+    int res = GeenieSerialBoard::config_board (conf, response);
+    if (res != (int)BrainFlowExitCodes::STATUS_OK)
     {
-        safe_logger (spdlog::level::err,
-            "Make sure you provided correct port name and have permissions to open it(run with "
-            "sudo/admin). Also, close all other apps using this port.");
-        return (int)BrainFlowExitCodes::UNABLE_TO_OPEN_PORT_ERROR;
+        gain_tracker.revert_config ();
     }
-    safe_logger (spdlog::level::trace, "port {} is open", serial->get_port_name ());
-    return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-int OpenBCISerialBoard::config_board (std::string config, std::string &response)
-{
-    if (!initialized)
-    {
-        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-    }
-    int res = (int)BrainFlowExitCodes::STATUS_OK;
-    if (is_streaming)
-    {
-        safe_logger (spdlog::level::warn,
-            "You are changing board params during streaming, it may lead to sync mismatch between "
-            "data acquisition thread and device");
-        res = send_to_board (config.c_str ());
-    }
-    else
-    {
-        // read response if streaming is not running
-        res = send_to_board (config.c_str (), response);
-    }
-
     return res;
 }
 
-int OpenBCISerialBoard::send_to_board (const char *msg)
+void Geenie::read_thread ()
 {
-    int length = (int)strlen (msg);
-    safe_logger (spdlog::level::debug, "sending {} to the board", msg);
-    int res = serial->send_to_serial_port ((const void *)msg, length);
-    if (res != length)
+    /*
+        Byte 1: 0xA0
+        Byte 2: Sample Number
+        Bytes 3-5: Data value for EEG channel 1
+        Bytes 6-8: Data value for EEG channel 2
+        Bytes 9-11: Data value for EEG channel 3
+        Bytes 12-14: Data value for EEG channel 4
+        Bytes 15-17: Data value for EEG channel 5
+        Bytes 18-20: Data value for EEG channel 6
+        Bytes 21-23: Data value for EEG channel 6
+        Bytes 24-26: Data value for EEG channel 8
+        Aux Data Bytes 27-32: 6 bytes of data
+        Byte 33: 0xCX where X is 0-F in hex
+    */
+    int res;
+    unsigned char b[32];
+    double accel[3] = {0.};
+    int num_rows = board_descr["default"]["num_rows"];
+    double *package = new double[num_rows];
+    for (int i = 0; i < num_rows; i++)
     {
-        return (int)BrainFlowExitCodes::BOARD_WRITE_ERROR;
+        package[i] = 0.0;
     }
+    std::vector<int> eeg_channels = board_descr["default"]["eeg_channels"];
+    double accel_scale = (double)(0.002 / (pow (2, 4)));
 
-    return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-int OpenBCISerialBoard::send_to_board (const char *msg, std::string &response)
-{
-    int length = (int)strlen (msg);
-    safe_logger (spdlog::level::debug, "sending {} to the board", msg);
-    int res = serial->send_to_serial_port ((const void *)msg, length);
-    if (res != length)
+    while (keep_alive)
     {
-        response = "";
-        return (int)BrainFlowExitCodes::BOARD_WRITE_ERROR;
-    }
-    response = read_serial_response ();
-
-    return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-std::string OpenBCISerialBoard::read_serial_response ()
-{
-    constexpr int max_tmp_size = 4096;
-    unsigned char tmp_array[max_tmp_size];
-    unsigned char tmp;
-    int tmp_id = 0;
-    while (serial->read_from_serial_port (&tmp, 1) == 1)
-    {
-        if (tmp_id < max_tmp_size)
+        // check start byte
+        res = serial->read_from_serial_port (b, 1);
+        if (res != 1)
         {
-            tmp_array[tmp_id] = tmp;
-            tmp_id++;
+            safe_logger (spdlog::level::debug, "unable to read 1 byte");
+            continue;
         }
-        else
+        if (b[0] != START_BYTE)
         {
-            serial->flush_buffer ();
+            continue;
+        }
+
+        int remaining_bytes = 32;
+        int pos = 0;
+        while ((remaining_bytes > 0) && (keep_alive))
+        {
+            res = serial->read_from_serial_port (b + pos, remaining_bytes);
+            remaining_bytes -= res;
+            pos += res;
+        }
+        if (!keep_alive)
+        {
             break;
         }
-    }
-    tmp_id = (tmp_id == max_tmp_size) ? tmp_id - 1 : tmp_id;
-    tmp_array[tmp_id] = '\0';
 
-    return std::string ((const char *)tmp_array);
-}
-
-int OpenBCISerialBoard::set_port_settings ()
-{
-    int res = serial->set_serial_port_settings (1000, false);
-    if (res < 0)
-    {
-        safe_logger (spdlog::level::err, "Unable to set port settings, res is {}", res);
-        return (int)BrainFlowExitCodes::SET_PORT_ERROR;
-    }
-    safe_logger (spdlog::level::trace, "set port settings");
-#ifdef __APPLE__
-    int set_latency_res = serial->set_custom_latency (1);
-    safe_logger (spdlog::level::info, "set_latency_res is: {}", set_latency_res);
-#endif
-    return send_to_board ("v");
-}
-
-int OpenBCISerialBoard::status_check ()
-{
-    unsigned char buf[1];
-    int count = 0;
-    int max_empty_seq = 5;
-    int num_empty_attempts = 0;
-    std::string resp = "";
-
-    for (int i = 0; i < 500; i++)
-    {
-        int res = serial->read_from_serial_port (buf, 1);
-        if (res > 0)
+        if ((b[31] < END_BYTE_STANDARD) || (b[31] > END_BYTE_MAX))
         {
-            resp += buf[0];
-            num_empty_attempts = 0;
-            // board is ready if there are '$$$'
-            if (buf[0] == '$')
-            {
-                count++;
-            }
-            else
-            {
-                count = 0;
-            }
-            if (count == 3)
-            {
-                return (int)BrainFlowExitCodes::STATUS_OK;
-            }
-        }
-        else
-        {
-            num_empty_attempts++;
-            if (num_empty_attempts > max_empty_seq)
-            {
-                safe_logger (spdlog::level::err, "board doesnt send welcome characters! Msg: {}",
-                    resp.c_str ());
-                return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-            }
-        }
-    }
-    return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-}
-
-int OpenBCISerialBoard::prepare_session ()
-{
-    if (initialized)
-    {
-        safe_logger (spdlog::level::info, "Session already prepared");
-        return (int)BrainFlowExitCodes::STATUS_OK;
-    }
-    if (params.serial_port.empty ())
-    {
-        safe_logger (spdlog::level::err, "serial port is empty");
-        return (int)BrainFlowExitCodes::INVALID_ARGUMENTS_ERROR;
-    }
-#ifdef _WIN32
-    LONG res = set_ftdi_latency_in_registry (1, params.serial_port);
-    if (res != ERROR_SUCCESS)
-    {
-        safe_logger (spdlog::level::warn,
-            "failed to adjust latency param in ftdi driver automatically, reboot or dongle "
-            "reconnection may be needed.");
-    }
-#endif
-    serial = Serial::create (params.serial_port.c_str (), this);
-    int port_open = open_port ();
-    if (port_open != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        delete serial;
-        serial = NULL;
-        return port_open;
-    }
-
-    int set_settings = set_port_settings ();
-    if (set_settings != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        delete serial;
-        serial = NULL;
-        return set_settings;
-    }
-
-    int initted = status_check ();
-    if (initted != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        delete serial;
-        serial = NULL;
-        return initted;
-    }
-
-    int send_res = send_to_board ("d");
-    if (send_res != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        return send_res;
-    }
-    // cyton sends response back, clean serial buffer and analyze response
-    std::string response = read_serial_response ();
-    if (response.substr (0, 7).compare ("Failure") == 0)
-    {
-        safe_logger (spdlog::level::err,
-            "Board config error, probably dongle is inserted but Cyton is off.");
-        safe_logger (spdlog::level::trace, "read {}", response.c_str ());
-        delete serial;
-        serial = NULL;
-        return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
-    }
-
-    initialized = true;
-    return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-int OpenBCISerialBoard::start_stream (int buffer_size, const char *streamer_params)
-{
-    if (is_streaming)
-    {
-        safe_logger (spdlog::level::err, "Streaming thread already running");
-        return (int)BrainFlowExitCodes::STREAM_ALREADY_RUN_ERROR;
-    }
-
-    int res = prepare_for_acquisition (buffer_size, streamer_params);
-    if (res != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        return res;
-    }
-
-    // start streaming
-    int send_res = send_to_board ("b");
-    if (send_res != (int)BrainFlowExitCodes::STATUS_OK)
-    {
-        return send_res;
-    }
-    keep_alive = true;
-    streaming_thread = std::thread ([this] { this->read_thread (); });
-    is_streaming = true;
-    return (int)BrainFlowExitCodes::STATUS_OK;
-}
-
-int OpenBCISerialBoard::stop_stream ()
-{
-    if (is_streaming)
-    {
-        keep_alive = false;
-        is_streaming = false;
-        if (streaming_thread.joinable ())
-        {
-            streaming_thread.join ();
+            safe_logger (spdlog::level::warn, "Wrong end byte {}", b[31]);
+            continue;
         }
 
-        return send_to_board ("s");
-    }
-    else
-    {
-        return (int)BrainFlowExitCodes::STREAM_THREAD_IS_NOT_RUNNING;
-    }
-}
-
-int OpenBCISerialBoard::release_session ()
-{
-    if (initialized)
-    {
-        if (is_streaming)
+        // package num
+        package[board_descr["default"]["package_num_channel"].get<int> ()] = (double)b[0];
+        // eeg
+        for (unsigned int i = 0; i < eeg_channels.size (); i++)
         {
-            stop_stream ();
+            double eeg_scale = (double)(4.5 / float ((pow (2, 23) - 1)) /
+                gain_tracker.get_gain_for_channel (i) * 1000000.);
+            package[eeg_channels[i]] = eeg_scale * cast_24bit_to_int32 (b + 1 + 3 * i);
         }
-        free_packages ();
-        initialized = false;
+        // end byte
+        package[board_descr["default"]["other_channels"][0].get<int> ()] = (double)b[31];
+        // place unprocessed bytes for all modes to other_channels
+        package[board_descr["default"]["other_channels"][1].get<int> ()] = (double)b[25];
+        package[board_descr["default"]["other_channels"][2].get<int> ()] = (double)b[26];
+        package[board_descr["default"]["other_channels"][3].get<int> ()] = (double)b[27];
+        package[board_descr["default"]["other_channels"][4].get<int> ()] = (double)b[28];
+        package[board_descr["default"]["other_channels"][5].get<int> ()] = (double)b[29];
+        package[board_descr["default"]["other_channels"][6].get<int> ()] = (double)b[30];
+        // place processed bytes for accel
+        if (b[31] == END_BYTE_STANDARD)
+        {
+            int32_t accel_temp[3] = {0};
+            accel_temp[0] = cast_16bit_to_int32 (b + 25);
+            accel_temp[1] = cast_16bit_to_int32 (b + 27);
+            accel_temp[2] = cast_16bit_to_int32 (b + 29);
+
+            if (accel_temp[0] != 0)
+            {
+                accel[0] = accel_scale * accel_temp[0];
+                accel[1] = accel_scale * accel_temp[1];
+                accel[2] = accel_scale * accel_temp[2];
+            }
+
+            package[board_descr["default"]["accel_channels"][0].get<int> ()] = accel[0];
+            package[board_descr["default"]["accel_channels"][1].get<int> ()] = accel[1];
+            package[board_descr["default"]["accel_channels"][2].get<int> ()] = accel[2];
+        }
+
+        // place processed bytes for analog
+        if (b[31] == END_BYTE_ANALOG)
+        {
+            package[board_descr["default"]["analog_channels"][0].get<int> ()] =
+                cast_16bit_to_int32 (b + 25);
+            package[board_descr["default"]["analog_channels"][1].get<int> ()] =
+                cast_16bit_to_int32 (b + 27);
+            package[board_descr["default"]["analog_channels"][2].get<int> ()] =
+                cast_16bit_to_int32 (b + 29);
+        }
+
+        package[board_descr["default"]["timestamp_channel"].get<int> ()] = get_timestamp ();
+
+        push_package (package);
     }
-    if (serial)
-    {
-        serial->close_serial_port ();
-        delete serial;
-        serial = NULL;
-    }
-    return (int)BrainFlowExitCodes::STATUS_OK;
+    delete[] package;
 }

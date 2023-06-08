@@ -80,9 +80,10 @@ enum class BoardIds : int
     GANGLION_NATIVE_BOARD = 46,
     EMOTIBIT_BOARD = 47,
     GEENIE_BOARD = 48,
+    EGEENIE_BOARD = 49,
     // use it to iterate
     FIRST = PLAYBACK_FILE_BOARD,
-    LAST = GEENIE_BOARD
+    LAST = EGEENIE_BOARD
 };
 
 enum class IpProtocolTypes : int

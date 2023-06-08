@@ -67,7 +67,7 @@ class BoardIds(enum.IntEnum):
     GANGLION_NATIVE_BOARD = 46  #:
     EMOTIBIT_BOARD = 47  #:
     GEENIE_BOARD = 48  #:
-
+    EGEENIE_BOARD = 49  #:
 
 class IpProtocolTypes(enum.IntEnum):
     """Enum to store Ip Protocol types"""
