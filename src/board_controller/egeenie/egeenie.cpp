@@ -268,7 +268,7 @@ int Egeenie::set_port_settings ()
         return (int)BrainFlowExitCodes::SET_PORT_ERROR;
 #endif
     }
-    res = serial->set_custom_baudrate (921600);
+    res = serial->set_custom_baudrate (115200);
     if (res < 0)
     {
         safe_logger (spdlog::level::err, "Unable to set custom baud rate, res is {}", res);

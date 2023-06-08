@@ -23,6 +23,7 @@ while 1:
     if temp:
         if byt == "A0":
             temp = True
+            print(byt)
             mylist.append(byt)
     else:
         mylist.append(byt)

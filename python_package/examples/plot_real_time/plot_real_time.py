@@ -14,9 +14,10 @@ class Graph:
 
         self.board_id = board_shim.get_board_id()
         self.board_shim = board_shim
-        self.exg_channels = BoardShim.get_exg_channels(self.board_id)
+        self.eeg_channels = BoardShim.get_eeg_channels(self.board_id)
         self.sampling_rate = BoardShim.get_sampling_rate(self.board_id)
-        self.update_speed_ms = 50
+        # self.update_speed_ms = 50
+        self.update_speed_ms = 500
         self.window_size = 4
         self.num_points = self.window_size * self.sampling_rate
 
@@ -46,7 +47,7 @@ class Graph:
     def _init_timeseries(self):
         self.plots = list()
         self.curves = list()
-        for i in range(len(self.exg_channels)):
+        for i in range(len(self.eeg_channels)):
             p = self.win.addPlot(row=i, col=0)
             p.showAxis('left', False)
             p.setMenuEnabled('left', False)
@@ -60,20 +61,20 @@ class Graph:
             self.curves.append(curve)
 
     def _init_psd(self):
-        self.psd_plot = self.win.addPlot(row=0, col=1, rowspan=len(self.exg_channels) // 2)
+        self.psd_plot = self.win.addPlot(row=0, col=1, rowspan=len(self.eeg_channels) // 2)
         self.psd_plot.showAxis('left', False)
         self.psd_plot.setMenuEnabled('left', False)
         self.psd_plot.setTitle('PSD Plot')
         self.psd_plot.setLogMode(False, True)
         self.psd_curves = list()
         self.psd_size = DataFilter.get_nearest_power_of_two(self.sampling_rate)
-        for i in range(len(self.exg_channels)):
+        for i in range(len(self.eeg_channels)):
             psd_curve = self.psd_plot.plot(pen=self.pens[i % len(self.pens)])
             psd_curve.setDownsampling(auto=True, method='mean', ds=3)
             self.psd_curves.append(psd_curve)
 
     def _init_band_plot(self):
-        self.band_plot = self.win.addPlot(row=len(self.exg_channels) // 2, col=1, rowspan=len(self.exg_channels) // 2)
+        self.band_plot = self.win.addPlot(row=len(self.eeg_channels) // 2, col=1, rowspan=len(self.eeg_channels) // 2)
         self.band_plot.showAxis('left', False)
         self.band_plot.setMenuEnabled('left', False)
         self.band_plot.showAxis('bottom', False)
@@ -87,8 +88,9 @@ class Graph:
     def update(self):
         data = self.board_shim.get_current_board_data(self.num_points)
         avg_bands = [0, 0, 0, 0, 0]
-        for count, channel in enumerate(self.exg_channels):
+        for count, channel in enumerate(self.eeg_channels):
             # plot timeseries
+            print(f"data: {data[channel]}")
             DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
             DataFilter.perform_bandpass(data[channel], self.sampling_rate, 3.0, 45.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
@@ -111,7 +113,7 @@ class Graph:
                 avg_bands[3] = avg_bands[3] + DataFilter.get_band_power(psd_data, 13.0, 30.0)
                 avg_bands[4] = avg_bands[4] + DataFilter.get_band_power(psd_data, 30.0, 50.0)
 
-        avg_bands = [int(x * 100 / len(self.exg_channels)) for x in avg_bands]
+        avg_bands = [int(x * 100 / len(self.eeg_channels)) for x in avg_bands]
         self.band_bar.setOpts(height=avg_bands)
 
         self.app.processEvents()
@@ -129,7 +131,7 @@ def main():
     parser.add_argument('--ip-protocol', type=int, help='ip protocol, check IpProtocolType enum', required=False,
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')
@@ -153,7 +155,8 @@ def main():
     params.file = args.file
     params.master_board = args.master_board
 
-    board_shim = BoardShim(args.board_id, params)
+    # board_shim = BoardShim(args.board_id, params)
+    board_shim = BoardShim(49, params)
     try:
         board_shim.prepare_session()
         board_shim.start_stream(450000, args.streamer_params)
