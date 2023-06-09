@@ -90,7 +90,7 @@ class Graph:
         avg_bands = [0, 0, 0, 0, 0]
         for count, channel in enumerate(self.eeg_channels):
             # plot timeseries
-            print(f"data: {data[channel]}")
+            # print(f"data: {data[channel][0]}")
             DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
             DataFilter.perform_bandpass(data[channel], self.sampling_rate, 3.0, 45.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
@@ -131,7 +131,7 @@ def main():
     parser.add_argument('--ip-protocol', type=int, help='ip protocol, check IpProtocolType enum', required=False,
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')

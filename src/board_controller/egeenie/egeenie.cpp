@@ -13,7 +13,7 @@ constexpr int Egeenie::end_byte;
 constexpr double Egeenie::ads_gain;
 constexpr double Egeenie::ads_vref;
 
-#define START_BYTE 0xA0
+#define START_BYTE 0x41
 #define END_BYTE_STANDARD 0xC0
 #define END_BYTE_MAX 0xC6
 
@@ -144,7 +144,7 @@ void Egeenie::read_thread ()
     */
     int res;
     // unsigned char b[32];
-    unsigned char b[28];
+    unsigned char b[30];
     // double accel[3] = {0.};
     int num_rows = board_descr["default"]["num_rows"];
     double *package = new double[num_rows];
@@ -170,7 +170,7 @@ void Egeenie::read_thread ()
             continue;
         }
         // int remaining_bytes = 32;
-        int remaining_bytes = 28;
+        int remaining_bytes = 30;
         int pos = 0;
         while ((remaining_bytes > 0) && (keep_alive))
         {
@@ -183,9 +183,9 @@ void Egeenie::read_thread ()
             break;
         }
 
-        if ((b[27] < END_BYTE_STANDARD) || (b[27] > END_BYTE_MAX))
+        if ((b[29] < END_BYTE_STANDARD) || (b[29] > END_BYTE_MAX))
         {
-            safe_logger (spdlog::level::warn, "Wrong end byte {}", b[27]);
+            safe_logger (spdlog::level::warn, "Wrong end byte {}", b[29]);
             continue;
         }
 

@@ -1,7 +1,7 @@
 import serial
 
 ser = serial.Serial(
-    port='COM4',
+    port='/dev/ttyUSB0',
     baudrate=115200,
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,
@@ -21,7 +21,7 @@ while 1:
     x = ser.read()
     byt = hexlify(x)
     if temp:
-        if byt == "A0":
+        if byt == "41":
             temp = True
             print(byt)
             mylist.append(byt)
