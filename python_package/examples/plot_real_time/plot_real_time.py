@@ -132,8 +132,8 @@ def main():
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
     # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
-    parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='')
+    parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='C4:DD:57:9D:08:2A')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')
     parser.add_argument('--serial-number', type=str, help='serial number', required=False, default='')
@@ -157,7 +157,7 @@ def main():
     params.master_board = args.master_board
 
     # board_shim = BoardShim(args.board_id, params)
-    board_shim = BoardShim(49, params)
+    board_shim = BoardShim(48, params)
     try:
         board_shim.prepare_session()
         board_shim.start_stream(450000, args.streamer_params)

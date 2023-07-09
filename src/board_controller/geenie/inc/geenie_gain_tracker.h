@@ -14,7 +14,7 @@ enum class GeenieCommandTypes : int
 };
 
 
-class GainTracker
+class EgainTracker
 {
 protected:
     size_t single_command_size = 9;
@@ -71,7 +71,7 @@ protected:
     }
 
 public:
-    GainTracker (std::vector<int> default_gains)
+    EgainTracker (std::vector<int> default_gains)
         : current_gains (default_gains), old_gains (default_gains)
     {
         channel_letters = std::vector<char> {
@@ -79,7 +79,7 @@ public:
         available_gain_values = std::vector<int> {1, 2, 4, 6, 8, 12, 24};
     }
 
-    virtual ~GainTracker ()
+    virtual ~EgainTracker ()
     {
     }
 
@@ -128,10 +128,10 @@ public:
     }
 };
 
-class GeenieGainTracker : public GainTracker
+class GeenieGainTracker : public EgainTracker
 {
 public:
-    GeenieGainTracker () : GainTracker ({24, 24, 24, 24, 24, 24, 24, 24})
+    GeenieGainTracker () : EgainTracker ({24, 24, 24, 24, 24, 24, 24, 24})
     {
     }
 
@@ -147,15 +147,15 @@ public:
             }
         }
 
-        return GainTracker::apply_config (config);
+        return EgainTracker::apply_config (config);
     }
 };
 
-class GeenieDaisyGainTracker : public GainTracker
+class GeenieDaisyGainTracker : public EgainTracker
 {
 public:
     GeenieDaisyGainTracker ()
-        : GainTracker ({24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24})
+        : EgainTracker ({24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24})
     {
     }
 
@@ -171,6 +171,6 @@ public:
             }
         }
 
-        return GainTracker::apply_config (config);
+        return EgainTracker::apply_config (config);
     }
 };

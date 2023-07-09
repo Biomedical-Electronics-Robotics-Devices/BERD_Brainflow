@@ -892,16 +892,17 @@ BrainFlowBoards::BrainFlowBoards()
         {"num_rows", 11},
         {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}}
     };
-    brainflow_boards_json["boards"]["49"]["default"] =
-    {
-        {"name", "Egeenie"},
-        {"sampling_rate", 250},
-        {"package_num_channel", 0},
-        {"timestamp_channel", 9},
-        {"marker_channel", 10},
-        {"num_rows", 11},
-        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}}
-    };
+    // brainflow_boards_json["boards"]["37"]["default"] =
+    // {
+    //     {"name", "Enophone"},
+    //     {"sampling_rate", 250},
+    //     {"timestamp_channel", 5},
+    //     {"marker_channel", 6},
+    //     {"package_num_channel", 0},
+    //     {"num_rows", 7},
+    //     {"eeg_channels", {1, 2, 3, 4}},
+    //     {"eeg_names", "A2,A1,C4,C3"}
+    // };
 }
 
 BrainFlowBoards boards_struct;
