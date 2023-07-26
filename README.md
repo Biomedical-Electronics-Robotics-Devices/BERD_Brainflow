@@ -1,3 +1,23 @@
+## ____Geenie_Specific ____
+
+The implementation for brainflow - geenie compatibility is based on brainflow's suggested 
+development process.
+
+The files created/modified to incorporate the addition are:
+
+- [src/board_controller/geenie/#](src/board_controller/geenie)
+- [src/board_controller/board_controller.cpp](src/board_controller/board_controller.cpp)
+- [src/board_controller/brainflow_boards.cpp](src/board_controller/brainflow_boards.cpp)
+- [src/board_controller/build.cmake](src/board_controller/build.cmake)
+
+Testing the device with the examples in:
+
+- [python_package/examples/plot_real_time](python_package/examples/plot_real_time)
+
+## ________________________
+
+## Brainflow Documentation:
+
 <p align="center">
     <img width="400" height="160" src="https://live.staticflickr.com/65535/49908747533_f359f83610_w.jpg">
     <br>
