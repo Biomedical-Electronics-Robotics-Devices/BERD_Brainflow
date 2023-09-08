@@ -97,8 +97,6 @@ class Geenie:
     def read(self):
         counter = 0
 
-        packets=0
-
         temp = False
         mylist = []
         mylistint = []
@@ -108,6 +106,7 @@ class Geenie:
             byt = self.hexlify(x)
             if temp:
                 if byt == "41":
+                    print(x)
                     temp = True
                     # print(byt)
                     mylist.append(byt)
@@ -117,9 +116,9 @@ class Geenie:
                 mylistint.append(x)
                 if byt == "C0":
                     if len(mylist) > 30:
-                        packets += 1
+                        print(mylist)
                         for ch in range(self.channel_num):
-                            # TODO Conversion here is probably wrong, check brainflow's conversiοn process
+                            # TODO Conversion here is probably wrong, check brainflow's conversin process
                             channel_byte_array = mylistint[(2+ch*3):(2+ch*3+3)]
                             channel_byte_array.append(b'?')
                             bstr = b''.join(channel_byte_array)
@@ -129,9 +128,6 @@ class Geenie:
                         mylist = []
                         mylistint = []
                         temp = False
-            if packets == 250:
-                packets = 0
-                print(".")
         self.measurement_ongoing = False
         self.save_file()
         return None
@@ -162,7 +158,7 @@ if __name__ == "__main__":
     #             mylist.append(byt)
     #             if byt == "C0":
     #                 if len(mylist) > 30:
-    #                     print(mylist)
+    #
     #                     mylist = []
     #                     temp = False
 
