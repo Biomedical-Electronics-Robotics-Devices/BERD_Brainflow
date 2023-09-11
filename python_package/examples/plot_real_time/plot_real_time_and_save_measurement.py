@@ -120,7 +120,7 @@ class Graph:
         for count, channel in enumerate(self.eeg_channels):
             # plot timeseries
             # print(f"data: {data[channel][0]}")
-            self.data[channel - 1][self.counter] = data[channel][0]
+            # self.data[channel - 1][self.counter] = data[channel][0]
             DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
             DataFilter.perform_bandpass(data[channel], self.sampling_rate, 3.0, 45.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
