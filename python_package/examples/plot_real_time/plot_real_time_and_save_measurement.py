@@ -16,7 +16,7 @@ import struct
 
 
 class Graph:
-    def __init__(self, board_shim, comport="COM6"):
+    def __init__(self, board_shim, comport="/dev/ttyUSB0"):
 
         # MYCODE
         self.id = None
@@ -280,7 +280,7 @@ class Graph:
 
 if __name__ == '__main__':
 
-    comport = "COM6"
+    comport = "/dev/ttyUSB0"
     patientname = "Vasilis Vasilopoulos"
     recording_minutes = 1
 

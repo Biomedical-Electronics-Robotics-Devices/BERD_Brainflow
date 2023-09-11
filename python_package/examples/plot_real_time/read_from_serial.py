@@ -116,6 +116,7 @@ class Geenie:
                 mylist.append(byt)
                 mylistint.append(x)
                 if byt == "C0":
+                    print(mylist)
                     if len(mylist) > 30:
                         packets += 1
                         for ch in range(self.channel_num):
@@ -138,7 +139,7 @@ class Geenie:
 
 
 if __name__ == "__main__":
-    geenie = Geenie(port="COM6")
+    geenie = Geenie(port="/dev/ttyUSB0")
     geenie.new_measurement(patientname="Vasilis Vasilopoulos",
                            recording_minutes=1,
                            )
