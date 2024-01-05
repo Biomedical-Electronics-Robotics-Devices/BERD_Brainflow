@@ -139,7 +139,7 @@ class Geenie:
 
 
 if __name__ == "__main__":
-    geenie = Geenie(port="/dev/ttyUSB0")
+    geenie = Geenie(port="COM4")
     geenie.new_measurement(patientname="Vasilis Vasilopoulos",
                            recording_minutes=1,
                            )

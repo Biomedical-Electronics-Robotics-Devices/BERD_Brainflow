@@ -96,8 +96,8 @@ class Graph:
                                         FilterTypes.BUTTERWORTH.value, 0)
             DataFilter.perform_bandstop(data[channel], self.sampling_rate, 48.0, 52.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(data[channel], self.sampling_rate, 58.0, 62.0, 2,
-                                        FilterTypes.BUTTERWORTH.value, 0)
+            # DataFilter.perform_bandstop(data[channel], self.sampling_rate, 58.0, 62.0, 2,
+            #                             FilterTypes.BUTTERWORTH.value, 0)
             self.curves[count].setData(data[channel].tolist())
             if data.shape[1] > self.psd_size:
                 # plot psd
@@ -132,7 +132,7 @@ def main():
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
     # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM6')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')

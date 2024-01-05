@@ -14,6 +14,13 @@ Testing the device with the examples in:
 
 - [python_package/examples/plot_real_time](python_package/examples/plot_real_time)
 
+To build and install the library for testing:
+
+- navigate to [tools](tools) and build using `python3 build.py` or build using cmake. Further instructions can be found in the brainflow standard documentation.
+- after successfully building navigate to [python_package](python_package) and install the python library using `pip3 install .`
+- Run the examples in [python_package/examples/plot_real_time](python_package/examples/plot_real_time).
+- For the libraries needed for these examples check the [requirements.txt](python_package/examples/plot_real_time/requirements.txt)
+
 ## ________________________
 
 ## Brainflow Documentation:

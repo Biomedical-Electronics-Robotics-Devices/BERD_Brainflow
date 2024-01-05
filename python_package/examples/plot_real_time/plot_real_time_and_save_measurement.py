@@ -221,8 +221,8 @@ class Graph:
                                         FilterTypes.BUTTERWORTH.value, 0)
             DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 48.0, 52.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 58.0, 62.0, 2,
-                                        FilterTypes.BUTTERWORTH.value, 0)
+            # DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 58.0, 62.0, 2,
+            #                             FilterTypes.BUTTERWORTH.value, 0)
             self.curves[count].setData(mydata[channel].tolist())
 
         mydata = mydata[1:self.channel_num+1]
@@ -280,9 +280,9 @@ class Graph:
 
 if __name__ == '__main__':
 
-    comport = "/dev/ttyUSB0"
-    patientname = "Vasilis Vasilopoulos"
-    recording_minutes = 1
+    comport = "COM5"
+    patientname = "Patient1"
+    recording_minutes = 10
 
     BoardShim.enable_dev_board_logger()
     logging.basicConfig(level=logging.DEBUG)
@@ -296,7 +296,7 @@ if __name__ == '__main__':
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
     # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM6')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')
