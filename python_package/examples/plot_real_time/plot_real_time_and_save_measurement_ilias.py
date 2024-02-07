@@ -3,6 +3,7 @@ import json
 import logging
 import pickle
 import random
+import subprocess
 import time
 import mne
 
@@ -26,9 +27,9 @@ class Graph:
 
         # MYCODE
         subj='A02T'
-        with open(f'/home/ilias/develop/bci_source_level/MI_discrimination_danai.pkl', 'rb') as f:
+        with open(args.model_path, 'rb') as f:
             self.discrimination_model = pickle.load(f)
-        with open(f'/home/ilias/develop/bci_source_level/danai_csp_filters.pickle', 'rb') as f:
+        with open(args.csp_path, 'rb') as f:
             self.csp_filters = pickle.load(f)
         self.event_counter = 0
         self.events = []
@@ -151,14 +152,15 @@ class Graph:
     def update(self):
         self.event_counter += self.num_points / 4
         lr_dict = {769:'left', 770:'right'}
-        if self.event_counter % 10000 == 0 and self.event_counter > 5000:
+        if self.event_counter % 2000 == 0 and self.event_counter > 5000:
             ev = random.randint(769,770)
             self.events.append(f"{self.event_counter/1000*250}\t1\t{ev}")
             print(self.event_counter, lr_dict[ev])
         data = self.board_shim.get_current_board_data(self.num_points)
         #print(self.num_points)
-        y_p = self.predict(data[:8])
-        print(y_p)
+        if not args.calibration:
+            y_p = self.predict(data[:8])
+            print(y_p)
         avg_bands = [0, 0, 0, 0, 0]
         self.board_shim.insert_marker(769)
         for count, channel in enumerate(self.eeg_channels):
@@ -290,6 +292,8 @@ class Graph:
                             signal_headers=self.signal_headers,
                             header=self.header)
         print("File saved")
+        #if args.calibration:
+        #    self.board_shim.release_session()
 
     def hexlify(self, data):
         return ' '.join(f'{c:0>2X}' for c in data)
@@ -344,7 +348,10 @@ if __name__ == '__main__':
 
     comport = "/dev/ttyUSB0"
     patientname = "Patient1"
-    recording_minutes = 10
+    recording_minutes = 1 
+    # Fix
+    recording_minutes *= 2
+    recording_minutes = int(recording_minutes)
 
     BoardShim.enable_dev_board_logger()
     logging.basicConfig(level=logging.DEBUG)
@@ -369,6 +376,8 @@ if __name__ == '__main__':
     parser.add_argument('--master-board', type=int, help='master board id for streaming and playback boards',
                         required=False, default=BoardIds.NO_BOARD)
     parser.add_argument('--calibration', default=False)
+    parser.add_argument('--csp_path', type=str)
+    parser.add_argument('--model_path', type=str)
     args = parser.parse_args()
 
     params = BrainFlowInputParams()
@@ -392,7 +401,7 @@ if __name__ == '__main__':
         #    time.sleep(0.005)
         #    data = board_shim.get_current_board_data(250)
         #    print(data.shape)
-        g = Graph(board_shim, comport=comport, recording_minutes=10)
+        g = Graph(board_shim, comport=comport, recording_minutes=recording_minutes)
 
     except BaseException:
         logging.warning('Exception', exc_info=True)
@@ -400,10 +409,13 @@ if __name__ == '__main__':
         if board_shim.is_prepared():
             logging.info('Releasing session')
             board_shim.release_session()
-            #with open('events.evt', 'w') as f:
-            #    f.write('\n'.join(g.events))
+            
+            
         if args.calibration:
-            mne.io.read_raw_edf(g.edf_filename)
+            evt_file = f'{g.edf_filename}_events.evt'
+            with open(evt_file, 'w') as f:
+               f.write('\n'.join(g.events))
+            subprocess.run(["python", "event_discrimination.py", g.edf_filename, evt_file])
         #    #TODO
         #    train_and_save_model(data)
             
