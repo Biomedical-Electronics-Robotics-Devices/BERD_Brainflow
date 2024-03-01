@@ -10,7 +10,7 @@ import mne
 
 import pyqtgraph as pg
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
-from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations
+from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations, NoiseEstimationLevelTypes, ThresholdTypes, WaveletDenoisingTypes, WaveletExtensionTypes, WaveletTypes
 from pyqtgraph.Qt import QtGui, QtCore
 from scipy import signal
 
@@ -23,15 +23,18 @@ import datetime
 import struct
 
 
+
+
 class Graph:
     def __init__(self, board_shim, recording_minutes=1, comport="/dev/ttyUSB0"):
 
         # MYCODE
-        subj='A02T'
-        with open(args.model_path, 'rb') as f:
-            self.discrimination_model = pickle.load(f)
-        with open(args.csp_path, 'rb') as f:
-            self.csp_filters = pickle.load(f)
+        if not args.calibration:
+            subj='A02T'
+            with open(args.model_path, 'rb') as f:
+                self.discrimination_model = pickle.load(f)
+            with open(args.csp_path, 'rb') as f:
+                self.csp_filters = pickle.load(f)
         self.event_counter = 0
         self.events = []
         self.id = None
@@ -153,26 +156,31 @@ class Graph:
     def update(self):
         self.event_counter += self.num_points / 4
         lr_dict = {769:'left', 770:'right'}
-        if self.event_counter % 2000 == 0 and self.event_counter > 5000:
+        if self.event_counter % 6000 == 0 and self.event_counter > 5000:
             ev = random.randint(769,770)
             self.events.append(f"{self.event_counter/1000*250}\t1\t{ev}")
             print(self.event_counter, lr_dict[ev])
-        data = self.board_shim.get_current_board_data(self.num_points)
+        data = self.board_shim.get_current_board_data(self.num_points)[:, :250]
+        #print(np.max(np.abs(data[1])))
+        #print(data.shape)
         #print(self.num_points)
         if not args.calibration:
             y_p = int(self.predict(data[:8]))
             res = mqttc.publish(topic='testtopic/', payload=json.dumps({"prediction": y_p}))
+            print(y_p)
             print(res)
         avg_bands = [0, 0, 0, 0, 0]
-        self.board_shim.insert_marker(769)
+        #self.board_shim.insert_marker(769)
         for count, channel in enumerate(self.eeg_channels):
             # plot timeseries
             # print(f"data: {data[channel][0]}")
             # self.data[channel - 1][self.counter] = data[channel][0]
             DataFilter.detrend(data[channel], DetrendOperations.CONSTANT.value)
+            #DataFilter.perform_wavelet_denoising(data[channel], WaveletTypes.BIOR3_9, 3, WaveletDenoisingTypes.SURESHRINK, ThresholdTypes.HARD,
+            #                                     WaveletExtensionTypes.SYMMETRIC, NoiseEstimationLevelTypes.ALL_LEVELS)
             DataFilter.perform_bandpass(data[channel], self.sampling_rate, 3.0, 45.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(data[channel], self.sampling_rate, 48.0, 52.0, 2,
+            DataFilter.perform_bandstop(data[channel], self.sampling_rate, 45.0, 54.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
             DataFilter.perform_bandstop(data[channel], self.sampling_rate, 98.0, 102.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
@@ -229,8 +237,8 @@ class Graph:
 
         self.signal_headers = highlevel.make_signal_headers(channel_names,
                                                             sample_frequency=sampling_rate,
-                                                            physical_min=-300000,
-                                                            physical_max=300000)
+                                                            physical_min=-3000,
+                                                            physical_max=3000)
         self.header = highlevel.make_header(technician=technician,
                                             recording_additional=recording_additional,
                                             patientname=patientname,
@@ -274,9 +282,11 @@ class Graph:
             # print(f"data: {data[channel][0]}")
             self.data[channel - 1][self.counter] = mydata[channel][0]
             DataFilter.detrend(mydata[channel], DetrendOperations.CONSTANT.value)
+            #DataFilter.perform_wavelet_denoising(mydata[channel], WaveletTypes.BIOR3_9, 3, WaveletDenoisingTypes.SURESHRINK, ThresholdTypes.HARD,
+            #                                     WaveletExtensionTypes.SYMMETRIC, NoiseEstimationLevelTypes.FIRST_LEVEL)
             DataFilter.perform_bandpass(mydata[channel], self.sampling_rate, 3.0, 45.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
-            DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 48.0, 52.0, 2,
+            DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 45.0, 54.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
             DataFilter.perform_bandstop(mydata[channel], self.sampling_rate, 98.0, 102.0, 2,
                                         FilterTypes.BUTTERWORTH.value, 0)
@@ -289,11 +299,28 @@ class Graph:
         # print(mydata)
         # print(len(self.signal_headers))
         # print(len(mydata))
-        highlevel.write_edf(edf_file=self.edf_filename,
-                            signals=mydata,
-                            signal_headers=self.signal_headers,
-                            header=self.header)
-        print("File saved")
+        np.save(f"{self.edf_filename}.npy", mydata)
+        while True:
+            try:
+                highlevel.write_edf(edf_file=self.edf_filename,
+                                    signals=mydata,
+                                    signal_headers=self.signal_headers,
+                                    header=self.header)
+                break
+            except AssertionError:
+                max_amp_ratio = mydata.max() / self.signal_headers['physical_max']
+                min_amp_ratio = mydata.min() / self.signal_headers['physical_min']
+                if max_amp_ratio > 1:
+                    self.signal_headers['physical_max'] = mydata.max() * 1.001
+                if min_amp_ratio > 1:
+                    self.signal_headers['physical_min'] = mydata.min() * 1.001
+
+        #highlevel.write_edf(edf_file=self.edf_filename,
+        #                    signals=mydata,
+        #                    signal_headers=self.signal_headers,
+        #                    header=self.header)
+        #print("File saved")
+        
         #if args.calibration:
         #    self.board_shim.release_session()
 
@@ -350,7 +377,7 @@ if __name__ == '__main__':
 
     comport = "/dev/ttyUSB0"
     patientname = "Patient1"
-    recording_minutes = 1 
+    recording_minutes = 10
     # Fix
     recording_minutes *= 2
     recording_minutes = int(recording_minutes)
@@ -367,7 +394,7 @@ if __name__ == '__main__':
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
     # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
+    # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')
@@ -401,7 +428,6 @@ if __name__ == '__main__':
         # Subscribing in on_connect() means that if we lose the connection and
         # reconnect then subscriptions will be renewed.
         #client.subscribe('testtopic/')
-
     global mqttc    
     mqttc = mqtt.Client(client_id='mqttx_5caec907')
     mqttc.on_connect = on_connect
