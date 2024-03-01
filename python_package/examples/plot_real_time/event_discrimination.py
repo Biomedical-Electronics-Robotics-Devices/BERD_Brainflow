@@ -8,13 +8,6 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import ShuffleSplit, cross_val_score, train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import RobustScaler
-from mne.decoding import SlidingEstimator
-from sklearn.feature_selection import f_classif, SelectKBest
-from sklearn.pipeline import make_pipeline
-
 import sys
 from scipy import signal
 from mne import Epochs, events_from_annotations, pick_types
@@ -31,7 +24,7 @@ def calculate_fbcsp(epochs_train):
         filtered.append(signal.sosfilt(sos, epochs_train))
     filtered = np.array(filtered)
     csps = []
-    n_components = 5
+    n_components = 3
     csp_filters = []
     for i in range(len(filtered)):
         csp = CSP(n_components=n_components, reg=None, log=True, norm_trace=False)
@@ -48,7 +41,7 @@ def calculate_fbcsp(epochs_train):
     return csps
 
 # %%
-subj = 'NSU3'
+subj = 'A02T'
 raw = mne.io.read_raw_edf(sys.argv[1], preload=True)
 ch_dict = {
     'ch1': 'FCz',
@@ -57,8 +50,8 @@ ch_dict = {
     'ch4': 'FC2',
     'ch5': 'C1',
     'ch6': 'C2',
-    'ch7': 'C3',
-    'ch8': 'C4'
+    'ch7': 'P1',
+    'ch8': 'P2'
 }
 
 # Set montage
@@ -99,9 +92,9 @@ raw.rename_channels(ch_dict)
 standard_1020 = mne.channels.make_standard_montage("standard_1020")
 raw.set_montage(standard_1020)
 evts = mne.read_events(sys.argv[2])
-evt_desc = { 769:'left',  770:'right'}
+evt_desc = { 769:'6',  770:'7'}
 annot_from_events = mne.annotations_from_events(
-    events=evts, event_desc=evt_desc, sfreq=raw.info['sfreq'],
+    events=evts, event_desc=evt_desc, sfreq=raw.info['sfreq']*1000,
     orig_time=raw.info['meas_date'])
 raw.set_annotations(annotations=annot_from_events)
 # Test with 6 Central Channels
@@ -113,7 +106,7 @@ print(raw.annotations[0])
 #event_id = dict(rs=5, mi=6)#, right=7, foot=8, tongue=9)
 #event_id = dict(hands=6, other=7)
 picks = pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude="bads")
-tmin, tmax = -3.0, 6.0
+tmin, tmax = -4.0, 6.0
 event_id=dict(left=769, right=770)
 # %%
 
@@ -133,16 +126,16 @@ epochs = Epochs(
 # %%
 mi_data = epochs.copy().crop(tmin=1., tmax=2.).get_data()
 rs_data = epochs.copy().crop(tmin=-2., tmax=-1.).get_data()
-rs_data = rs_data[:len(rs_data)//2]
+rs_data = rs_data[:len(rs_data)]
 #X = np.concatenate((mi_data, rs_data), axis=0)
 #y = np.array([0]*len(rs_data) + list(epochs.events[:,2]-5))
 X = epochs.copy().crop(tmin=1., tmax=2.).get_data()
 y = epochs.events[:, 2] - 768
-# print(y)
+print(y)
 X = np.concatenate((X, rs_data), axis=0)
 y = np.concatenate((y, np.array([0]*len(rs_data))), axis=0)
 
-print(X.shape)
+
 
 # %%
 #epochs_train = epochs.copy().crop(tmin=0., tmax=1.).get_data()
@@ -152,6 +145,14 @@ fmax = 20.
 #fbcsp_features = calculate_fbcsp(epochs_train)
 
 
+# %%
+filtered = []
+for i in range(4, 60, 4):
+    sos = signal.butter(2, [i, i+4], 'bandpass', fs=epochs.info['sfreq'], output='sos')
+    filtered.append(signal.sosfilt(sos, X))
+filtered = np.array(filtered)
+#filtered = filtered.transpose([1,0,2,3])
+filtered = filtered.reshape(filtered.shape[1], filtered.shape[0]*filtered.shape[2], filtered.shape[3])
 
 # %%
 
@@ -164,35 +165,41 @@ cv = ShuffleSplit(10, test_size=0.8, random_state=42)
 cv_split = cv.split(X_train)
 
 # %%
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import RobustScaler
+from mne.decoding import SlidingEstimator
+from sklearn.feature_selection import f_classif, SelectKBest
+from sklearn.pipeline import make_pipeline
 
-## Assemble a classifier
-#rf = GridSearchCV(
-#    RandomForestClassifier(),
-#    param_grid={
-#        'n_estimators': [10, 50, 70, 100, 150, 200],
-#        'criterion': ["gini", "entropy", "log_loss"],
-#        'max_features': ['sqrt', 'log2', None]
-#    }
-#)
-#lda = GridSearchCV(
-#    LinearDiscriminantAnalysis(),
-#    param_grid={
-#        "tol": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
-#        "solver": ['eigen', 'lsqr']
-#    }
-#)
-#svc = GridSearchCV(
-#    SVC(),
-#    param_grid={
-#        "C": [1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3],
-#        "gamma": np.logspace(-2, 2, 5),
-#        "kernel": ["rbf", "poly"],
-#        "degree": [2, 3, 4, 5, 6]
-#    }
-#)
-#csp = CSP(n_components=15, reg=None, log=True, norm_trace=False)
+# Assemble a classifier
+rf = GridSearchCV(
+    RandomForestClassifier(),
+    param_grid={
+        'n_estimators': [10, 50, 70, 100, 150, 200],
+        'criterion': ["gini", "entropy", "log_loss"],
+        'max_features': ['sqrt', 'log2', None]
+    }
+)
+lda = GridSearchCV(
+    LinearDiscriminantAnalysis(),
+    param_grid={
+        "tol": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
+        "solver": ['eigen', 'lsqr']
+    }
+)
+svc = GridSearchCV(
+    SVC(),
+    param_grid={
+        "C": [1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3],
+        "gamma": np.logspace(-2, 2, 5),
+        "kernel": ["rbf", "poly"],
+        "degree": [2, 3, 4, 5, 6]
+    }
+)
+csp = CSP(n_components=15, reg=None, log=True, norm_trace=False)
 # Use scikit-learn Pipeline with cross_val_score function
-clf = Pipeline([("LDA", LinearDiscriminantAnalysis())])
+clf = Pipeline([("LDA", svc)])
 
 
 # %%
@@ -209,14 +216,12 @@ print(
 # %%
 y_pred = clf.fit(X_train, y_train).score(X_test, y_test)
 print(y_pred)
-with open(f'MI_discrimination_{subj}.pkl','wb') as f:
-    pickle.dump(clf,f)
 # %%
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
-#y_pred = clf.predict(X_test)
-#cm = confusion_matrix(y_test, y_pred)
+y_pred = clf.predict(X_test)
+cm = confusion_matrix(y_test, y_pred)
 
-#cm_display = ConfusionMatrixDisplay(cm).plot()
+cm_display = ConfusionMatrixDisplay(cm).plot()
 
 # %%
 y_pred = clf.predict(X_test)

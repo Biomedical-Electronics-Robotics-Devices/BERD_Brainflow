@@ -179,8 +179,8 @@ class Graph:
 
         self.signal_headers = highlevel.make_signal_headers(channel_names,
                                                             sample_frequency=sampling_rate,
-                                                            physical_min=-30000,#-300000,
-                                                            physical_max=30000)#300000)
+                                                            physical_min=-300000,
+                                                            physical_max=300000)
         self.header = highlevel.make_header(technician=technician,
                                             recording_additional=recording_additional,
                                             patientname=patientname,
@@ -227,16 +227,14 @@ class Graph:
 
         mydata = mydata[1:self.channel_num+1]
 
-        print(mydata)
-        print(len(self.signal_headers))
-        print(len(mydata))
+        # print(mydata)
+        # print(len(self.signal_headers))
+        # print(len(mydata))
         highlevel.write_edf(edf_file=self.edf_filename,
                             signals=mydata,
                             signal_headers=self.signal_headers,
                             header=self.header)
         print("File saved")
-        np.save(file='./mydata.npy', arr=mydata)
-        print("Array saved")
 
     def hexlify(self, data):
         return ' '.join(f'{c:0>2X}' for c in data)
@@ -282,9 +280,9 @@ class Graph:
 
 if __name__ == '__main__':
 
-    comport = "/dev/ttyUSB0"
+    comport = "COM5"
     patientname = "Patient1"
-    recording_minutes = 1
+    recording_minutes = 10
 
     BoardShim.enable_dev_board_logger()
     logging.basicConfig(level=logging.DEBUG)
@@ -297,8 +295,8 @@ if __name__ == '__main__':
     parser.add_argument('--ip-protocol', type=int, help='ip protocol, check IpProtocolType enum', required=False,
                         default=0)
     parser.add_argument('--ip-address', type=str, help='ip address', required=False, default='')
-    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB0')
-    #parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
+    # parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='/dev/ttyUSB1')
+    parser.add_argument('--serial-port', type=str, help='serial port', required=False, default='COM4')
     parser.add_argument('--mac-address', type=str, help='mac address', required=False, default='')
     parser.add_argument('--other-info', type=str, help='other info', required=False, default='')
     parser.add_argument('--streamer-params', type=str, help='streamer params', required=False, default='')
