@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-#%%
+# %%
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,14 +7,13 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import ShuffleSplit, cross_val_score, train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline
-import sys
+
 from scipy import signal
 from mne import Epochs, events_from_annotations, pick_types
 from mne.channels import make_standard_montage
 from mne.datasets import eegbci
 from mne.decoding import CSP
 from mne.io import concatenate_raws, read_raw_edf
-
 
 def calculate_fbcsp(epochs_train):
     filtered = []
@@ -42,20 +40,11 @@ def calculate_fbcsp(epochs_train):
 
 # %%
 subj = 'A02T'
-raw = mne.io.read_raw_edf(sys.argv[1], preload=True)
-ch_dict = {
-    'ch1': 'FCz',
-    'ch2': 'Cz',
-    'ch3': 'FC1',
-    'ch4': 'FC2',
-    'ch5': 'C1',
-    'ch6': 'C2',
-    'ch7': 'P1',
-    'ch8': 'P2'
-}
+raw = mne.io.read_raw_gdf(f'BCICIV_2a_gdf/{subj}.gdf', preload=True)
+
 
 # Set montage
-'''ch_dict = {
+ch_dict = {
     'EEG-16': 'POz',
     'EEG-15': 'P2',
     'EEG-14': 'P1',
@@ -87,32 +76,25 @@ raw.set_channel_types({'EOG-l':'eog', 'EOG-c':'eog', 'EOG-r':'eog'})
 standard_1020 = mne.channels.make_standard_montage("standard_1020")
 raw.set_montage(standard_1020)
 layout_from_raw = mne.channels.make_eeg_layout(raw.info)
-raw.crop(520, None)'''
-raw.rename_channels(ch_dict)
-standard_1020 = mne.channels.make_standard_montage("standard_1020")
-raw.set_montage(standard_1020)
-evts = mne.read_events(sys.argv[2])
-evt_desc = { 769:'6',  770:'7'}
-annot_from_events = mne.annotations_from_events(
-    events=evts, event_desc=evt_desc, sfreq=raw.info['sfreq']*1000,
-    orig_time=raw.info['meas_date'])
-raw.set_annotations(annotations=annot_from_events)
+raw.crop(520, None)
+
 # Test with 6 Central Channels
 #drop_chans = [channel for channel in raw.ch_names if channel not in ['C1', 'C2', 'Cz', 'CPz', 'CP1', 'CP2']]
-#raw.drop_channels([channel for channel in raw.ch_names if channel not in ['C1', 'C2', 'Cz', 'FCz', 'FC1', 'FC2', 'FC4', 'FC3']])
-#print(raw.ch_names)
+raw.drop_channels([channel for channel in raw.ch_names if channel not in ['C1', 'C2', 'Cz', 'FCz', 'FC1', 'FC2', 'FC4', 'FC3']])
+print(raw.ch_names)
 #raw.filter(7.0, 30.0, fir_design="firwin", skip_by_annotation="edge")
-print(raw.annotations[0])
+events, _ = mne.events_from_annotations(raw, event_id={'769':6, '770':7})#, '771':8, '772':9}) # event_id={'769':6, '770':7, '771':8, '772':9}
 #event_id = dict(rs=5, mi=6)#, right=7, foot=8, tongue=9)
+event_id = dict(left=6, right=7)#, foot=8, tongue=9)
 #event_id = dict(hands=6, other=7)
 picks = pick_types(raw.info, meg=False, eeg=True, stim=False, eog=False, exclude="bads")
 tmin, tmax = -4.0, 6.0
-event_id=dict(left=769, right=770)
+
 # %%
 
 epochs = Epochs(
     raw,
-    evts,
+    events,
     event_id,
     tmin,
     tmax,
@@ -125,13 +107,12 @@ epochs = Epochs(
 
 # %%
 mi_data = epochs.copy().crop(tmin=1., tmax=2.).get_data()
-rs_data = epochs.copy().crop(tmin=-2., tmax=-1.).get_data()
+rs_data = epochs.copy().crop(tmin=-3., tmax=-1.).get_data()
 rs_data = rs_data[:len(rs_data)]
 #X = np.concatenate((mi_data, rs_data), axis=0)
 #y = np.array([0]*len(rs_data) + list(epochs.events[:,2]-5))
-X = epochs.copy().crop(tmin=1., tmax=2.).get_data()
-y = epochs.events[:, 2] - 768
-print(y)
+X = epochs.copy().crop(tmin=1., tmax=3.).get_data()
+y = epochs.events[:, 2] - 5
 X = np.concatenate((X, rs_data), axis=0)
 y = np.concatenate((y, np.array([0]*len(rs_data))), axis=0)
 
