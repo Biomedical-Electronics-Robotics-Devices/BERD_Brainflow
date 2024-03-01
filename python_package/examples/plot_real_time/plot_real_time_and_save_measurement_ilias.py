@@ -1,4 +1,3 @@
-import paho.mqtt.client as mqtt
 import argparse
 import json
 import logging
@@ -160,9 +159,8 @@ class Graph:
         data = self.board_shim.get_current_board_data(self.num_points)
         #print(self.num_points)
         if not args.calibration:
-            y_p = int(self.predict(data[:8]))
-            res = mqttc.publish(topic='testtopic/', payload=json.dumps({"prediction": y_p}))
-            print(res)
+            y_p = self.predict(data[:8])
+            print(y_p)
         avg_bands = [0, 0, 0, 0, 0]
         self.board_shim.insert_marker(769)
         for count, channel in enumerate(self.eeg_channels):
@@ -394,19 +392,6 @@ if __name__ == '__main__':
     params.file = args.file
     params.master_board = args.master_board
 
-
-    # The callback for when the client receives a CONNACK response from the server.
-    def on_connect(client, userdata, flags, reason_code):
-        print(f"Connected with result code {reason_code}")
-        # Subscribing in on_connect() means that if we lose the connection and
-        # reconnect then subscriptions will be renewed.
-        #client.subscribe('testtopic/')
-
-    global mqttc    
-    mqttc = mqtt.Client(client_id='mqttx_5caec907')
-    mqttc.on_connect = on_connect
-    mqttc.connect("127.0.0.1", 1883)
-    mqttc.loop_start()
     # board_shim = BoardShim(args.board_id, params)
     board_shim = BoardShim(49, params)
     try:
