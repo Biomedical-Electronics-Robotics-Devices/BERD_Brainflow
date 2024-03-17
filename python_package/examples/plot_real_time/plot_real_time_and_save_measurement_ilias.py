@@ -7,6 +7,7 @@ import random
 import subprocess
 import time
 import mne
+import joblib
 
 import pyqtgraph as pg
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
@@ -30,11 +31,9 @@ class Graph:
 
         # MYCODE
         if not args.calibration:
-            subj='A02T'
-            with open(args.model_path, 'rb') as f:
-                self.discrimination_model = pickle.load(f)
-            with open(args.csp_path, 'rb') as f:
-                self.csp_filters = pickle.load(f)
+            subj='A03T'
+            self.discrimination_model = joblib.load(f)
+            self.trained_csp = joblib.load(f)
         self.event_counter = 0
         self.events = []
         self.id = None
@@ -134,22 +133,9 @@ class Graph:
     def predict(self, X):
         if X.ndim == 2:
             X = X[np.newaxis, :]
-        filtered = []
-        for i in range(4, 45, 4):
-            sos = signal.butter(2, [i, i+4], 'bandpass', fs=250, output='sos')
-            filtered.append(signal.sosfilt(sos, X))
-        filtered = np.array(filtered)
-        csps = []
-        n_components = 10
-        #csp_filters = []
-        for i in range(len(filtered)):
-            features = self.csp_filters[i].transform(filtered[i])
-            features = features.T
-            csps.append(features)
-        csps = np.array(csps)
-        csps = csps.reshape((len(csps)*self.csp_filters[0].n_components, csps.shape[-1]))
-        csps = csps.T
-        y_pred = self.discrimination_model.predict(csps)
+
+        csp_features = self.trained_csp(X)
+        y_pred = self.discrimination_model.predict(csp_features)
         self.dump_prediction(y_pred)
         return y_pred
 
