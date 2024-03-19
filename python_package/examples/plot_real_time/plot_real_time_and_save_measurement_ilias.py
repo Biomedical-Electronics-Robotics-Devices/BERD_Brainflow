@@ -6,16 +6,14 @@ import pickle
 import random
 import subprocess
 import time
-import mne
 import joblib
 
 import pyqtgraph as pg
 from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
 from brainflow.data_filter import DataFilter, FilterTypes, WindowOperations, DetrendOperations, NoiseEstimationLevelTypes, ThresholdTypes, WaveletDenoisingTypes, WaveletExtensionTypes, WaveletTypes
-from pyqtgraph.Qt import QtGui, QtCore
-from scipy import signal
+from pyqtgraph.Qt import QtGui, QtCore, QtWidgets
 
-import serial
+#import serial
 from threading import Thread
 import pyedflib
 import numpy as np
@@ -32,8 +30,8 @@ class Graph:
         # MYCODE
         if not args.calibration:
             subj='A03T'
-            self.discrimination_model = joblib.load(f)
-            self.trained_csp = joblib.load(f)
+            self.discrimination_model = joblib.load(args.model_path)
+            self.trained_csp = joblib.load(args.csp_path)
         self.event_counter = 0
         self.events = []
         self.id = None
@@ -66,8 +64,8 @@ class Graph:
         self.window_size = 4
         self.num_points = self.window_size * self.sampling_rate
 
-        self.app = QtGui.QApplication([])
-        self.win = pg.GraphicsWindow(title='BrainFlow Plot', size=(800, 600))
+        self.app = QtWidgets.QApplication([])
+        self.win = pg.GraphicsLayoutWidget(title='BrainFlow Plot', size=(800, 600))
 
         self._init_pens()
         self._init_timeseries()
@@ -77,7 +75,7 @@ class Graph:
         timer = QtCore.QTimer()
         timer.timeout.connect(self.update)
         timer.start(self.update_speed_ms)
-        QtGui.QApplication.instance().exec_()
+        QtWidgets.QApplication.instance().exec_()
 
     def _init_pens(self):
         self.pens = list()
@@ -134,7 +132,7 @@ class Graph:
         if X.ndim == 2:
             X = X[np.newaxis, :]
 
-        csp_features = self.trained_csp(X)
+        csp_features = self.trained_csp.transform(X)
         y_pred = self.discrimination_model.predict(csp_features)
         self.dump_prediction(y_pred)
         return y_pred
@@ -151,7 +149,7 @@ class Graph:
         #print(data.shape)
         #print(self.num_points)
         if not args.calibration:
-            y_p = int(self.predict(data[:8]))
+            y_p = int(self.predict(data[:8])[0])
             res = mqttc.publish(topic='testtopic/', payload=json.dumps({"prediction": y_p}))
             print(y_p)
             print(res)
@@ -254,10 +252,10 @@ class Graph:
 
     def dump_prediction(self, y):
         fname = '../../prediction.json'
-        with open(fname, 'a+') as f:
-            x = f.readlines()
-            x.append(str(int(y)))
-            f.writelines(x)            
+        #with open(fname, 'a+') as f:
+        #    x = f.readlines()
+        #    x.append(str(int(y)))
+        #    f.writelines(x)            
 
 
     def save_file(self):
@@ -415,7 +413,7 @@ if __name__ == '__main__':
         # reconnect then subscriptions will be renewed.
         #client.subscribe('testtopic/')
     global mqttc    
-    mqttc = mqtt.Client(client_id='mqttx_5caec907')
+    mqttc = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1, client_id='mqttx_5caec907')
     mqttc.on_connect = on_connect
     mqttc.connect("127.0.0.1", 1883)
     mqttc.loop_start()
